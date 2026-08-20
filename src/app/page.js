@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Landscape from '@/components/Landscape';
 import InputModal from '@/components/InputModal';
+import FloatingCapsules from '@/components/FloatingCapsules';
 
 export default function Home() {
   const [timeStr, setTimeStr] = useState('');
@@ -43,7 +44,7 @@ export default function Home() {
     return () => clearInterval(weatherInterval);
   }, []);
 
-  // Hitung Fase Waktu Berdasarkan Jam
+  // Hitung Otomatis Fase Waktu Berdasarkan Jam
   const getTimePhase = (hour) => {
     if (hour >= 5 && hour < 6) return 'dawn';
     if (hour >= 6 && hour < 8) return 'sunrise';
@@ -86,18 +87,19 @@ export default function Home() {
   }, []);
 
   const handleCreateCapsule = (newCapsule) => {
-    // Acak otomatis 3 variasi efek visual saat pengiriman
-    const randomAnimations = ['lampion', 'star', 'firefly'];
-    const selectedAnim = randomAnimations[Math.floor(Math.random() * randomAnimations.length)];
+    // Tambahkan kapsul baru ke state lokal lanskap
+    setCapsules((prev) => [
+      ...prev,
+      {
+        ...newCapsule,
+        id: Date.now(),
+        // Memberikan posisi acak di langit
+        posX: `${Math.floor(Math.random() * 70) + 12}%`,
+        posY: `${Math.floor(Math.random() * 32) + 14}%`,
+      },
+    ]);
 
-    const capsuleWithAnim = {
-      ...newCapsule,
-      animationType: selectedAnim,
-    };
-
-    setCapsules((prev) => [...prev, capsuleWithAnim]);
-
-    // Kembang api selebrasi otomatis saat kapsul terkirim
+    // Peluncuran mercon otomatis
     setFireworksTrigger((prev) => prev + 1);
   };
 
@@ -117,7 +119,7 @@ export default function Home() {
         .lock-icon-twinkle { animation: lockIconTwinkle 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
       `}</style>
 
-      {/* Background Lanskap Real-Time */}
+      {/* Background Lanskap */}
       <Landscape 
         timeOfDay={selectedTime} 
         weather={selectedWeather}
@@ -125,7 +127,10 @@ export default function Home() {
         triggerFireworks={fireworksTrigger}
       />
 
-      {/* Header Jam, Tanggal & Tombol Gembok Input */}
+      {/* LAPISAN KAPSUL MELAYANG DI LANGIT */}
+      <FloatingCapsules capsules={capsules} />
+
+      {/* Header Jam & Tanggal */}
       <motion.header 
         initial={{ y: -30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
