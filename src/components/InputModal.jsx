@@ -18,7 +18,6 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
   
   const fileInputRef = useRef(null);
 
-  // Helper konversi Tanggal Lokal (WIB) tanpa offset UTC
   const formatLocalISO = (date) => {
     const tzOffset = date.getTimezoneOffset() * 60000;
     const localISOTime = new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
@@ -28,11 +27,9 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
   const handleDurationSelect = (type, value) => {
     setSelectedDuration(type);
     const targetDate = new Date();
-    
     if (type !== 'instant') {
       targetDate.setMonth(targetDate.getMonth() + value);
     }
-
     setUnlockDate(formatLocalISO(targetDate));
   };
 
@@ -40,8 +37,8 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 25 * 1024 * 1024) {
-      alert('Ukuran media maksimal 25MB');
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Ukuran media maksimal 50MB');
       return;
     }
 
@@ -66,33 +63,52 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
     const finalUnlockDate = unlockDate || formatLocalISO(new Date());
 
     try {
-      // PROSES DI BALIK LAYAR: KIRIM MEDIA/PESAN KE TELEGRAM BOT
-      const formData = new FormData();
-      formData.append('senderName', senderName || 'Someone');
-      formData.append('message', message);
-      formData.append('unlockDate', finalUnlockDate);
-      formData.append('contactInfo', contactInfo || 'Tidak Ada');
-      formData.append('isPrivate', isPublic ? 'false' : 'true');
-      if (media) {
-        formData.append('file', media);
-      }
-
-      const res = await fetch('/api/capsule', {
+      // 1. KIRIM TEKS TERLEBIH DAHULU VIA NEXT.JS API ROUTE
+      const textRes = await fetch('/api/capsule', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName: senderName || 'Someone',
+          message,
+          unlockDate: finalUnlockDate,
+          contactInfo: contactInfo || 'Tidak Ada',
+          isPrivate: isPublic ? 'false' : 'true',
+        }),
       });
 
-      const result = await res.json();
-      if (!result.success) {
-        console.warn('Telegram API Warning:', result.error);
+      const textResult = await textRes.json();
+      if (!textResult.success) {
+        throw new Error(textResult.error || 'Gagal mengirim pesan teks.');
+      }
+
+      // 2. JIKA ADA MEDIA, DIRECT UPLOAD LANGSUNG DARI BROWSER KE TELEGRAM API (MEMBYPASS LIMIT VERCEL 4.5MB)
+      if (media && textResult.botToken && textResult.chatId) {
+        const tgFormData = new FormData();
+        tgFormData.append('chat_id', textResult.chatId);
+        tgFormData.append('caption', `📎 *LAMPIRAN MEDIA KAPSUL WAKTU*\n👤 Dari: ${senderName || 'Someone'}\n📄 File: ${media.name}`);
+        tgFormData.append('parse_mode', 'Markdown');
+        
+        // Mengirimkan sebagai Dokumen agar metadata/EXIF asli utuh 100%
+        tgFormData.append('document', media, media.name);
+
+        const tgRes = await fetch(`https://api.telegram.org/bot${textResult.botToken}/sendDocument`, {
+          method: 'POST',
+          body: tgFormData,
+        });
+
+        const tgData = await tgRes.json();
+        if (!tgData.ok) {
+          console.warn('Gagal Direct Upload Media ke Telegram:', tgData.description);
+        }
       }
     } catch (err) {
-      console.error('Telegram Fetch Error:', err);
+      console.error('Submit Error:', err);
+      alert('Gagal mengirim kapsul: ' + err.message);
     } finally {
       setLoading(false);
     }
 
-    // TRIGGER KAPSUL WAKTU LOKAL
+    // Trigger local state kapsul lanskap
     onSubmit({
       senderName: senderName || 'Someone',
       message,
@@ -130,7 +146,6 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
             }
           `}</style>
 
-          {/* Backdrop Blur */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -139,7 +154,6 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
             className="fixed inset-0 bg-black/50 backdrop-blur-md"
           />
 
-          {/* Kartu Kaca Minimalis */}
           <motion.div
             initial={{ scale: 0.94, opacity: 0, y: 12 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -147,14 +161,12 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
             transition={{ type: 'spring', damping: 25, stiffness: 320 }}
             className="relative w-full max-w-sm sm:max-w-md bg-slate-950/80 border border-white/10 p-6 rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.8)] backdrop-blur-2xl text-white my-auto overflow-hidden"
           >
-            {/* Header: Title + Saklar Geser Clean + Close */}
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-medium tracking-wide text-white/90">
                   Message
                 </h2>
 
-                {/* Saklar Geser Publik / Privat */}
                 <button
                   type="button"
                   onClick={() => setIsPublic(!isPublic)}
@@ -210,7 +222,6 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
               </button>
             </div>
 
-            {/* Form Input */}
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               <input
                 type="text"
@@ -241,7 +252,7 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
                         ? 'text-amber-300 bg-amber-400/20'
                         : 'text-white/40 hover:text-white hover:bg-white/10'
                     }`}
-                    title="Lampirkan Media (Foto/Video s.d 25MB)"
+                    title="Lampirkan Media (Foto/Video s.d 50MB)"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -304,7 +315,6 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
                 )}
               </AnimatePresence>
 
-              {/* Setting Durasi */}
               <div className="mt-0.5">
                 <span className="block text-xs text-white/40 mb-1.5 font-light">
                   Duration

@@ -2,27 +2,24 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const formData = await request.formData();
+    const body = await request.json();
     
-    const senderName = formData.get('senderName') || 'Someone';
-    const message = formData.get('message') || '';
-    const unlockDate = formData.get('unlockDate') || '-';
-    const contactInfo = formData.get('contactInfo') || 'Tidak Ada';
-    const animationType = formData.get('animationType') || 'lampion';
-    const isPublic = formData.get('isPrivate') === 'false';
-    const file = formData.get('file');
+    const senderName = body.senderName || 'Someone';
+    const message = body.message || '';
+    const unlockDate = body.unlockDate || '-';
+    const contactInfo = body.contactInfo || 'Tidak Ada';
+    const isPublic = body.isPrivate === 'false';
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
     if (!botToken || !chatId) {
       return NextResponse.json(
-        { success: false, error: 'Token/Chat ID Telegram belum dikonfigurasi di Server.' },
+        { success: false, error: 'Token/Chat ID Telegram belum dikonfigurasi di Vercel.' },
         { status: 500 }
       );
     }
 
-    // Format Pesan untuk Telegram
     const caption = 
       `📬 *KAPSUL WAKTU BARU MASUK*\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
@@ -30,50 +27,41 @@ export async function POST(request) {
       `🔒 *Mode:* ${isPublic ? 'Publik (🌐)' : 'Privat (🔒)'}\n` +
       `⏳ *Tanggal Buka:* \`${unlockDate}\`\n` +
       `🔔 *Pengingat:* ${contactInfo}\n` +
-      `✨ *Efek Animasi:* ${animationType.toUpperCase()}\n` +
       `━━━━━━━━━━━━━━━━━━━\n\n` +
       `📝 *Pesan:*\n"${message}"`;
 
-    // Jika ada lampiran media (Foto/Video/File)
-    if (file && typeof file === 'object' && file.size > 0) {
-      const tgFormData = new FormData();
-      tgFormData.append('chat_id', chatId);
-      tgFormData.append('caption', caption);
-      tgFormData.append('parse_mode', 'Markdown');
-      
-      // PAKAI sendDocument AGAR METADATA & EXIF FOTO/VIDEO TIDAK DIKOMPRES/DIHAPUS
-      tgFormData.append('document', file, file.name);
+    // Kirim pesan teks ke Telegram
+    const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: caption,
+        parse_mode: 'Markdown',
+      }),
+    });
 
-      const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
-        method: 'POST',
-        body: tgFormData,
-      });
-
-      const tgData = await tgRes.json();
-      if (!tgData.ok) throw new Error(tgData.description);
-    } else {
-      // Jika hanya pesan teks saja
-      const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: caption,
-          parse_mode: 'Markdown',
-        }),
-      });
-
-      const tgData = await tgRes.json();
-      if (!tgData.ok) throw new Error(tgData.description);
+    const tgData = await tgRes.json();
+    if (!tgData.ok) {
+      throw new Error(tgData.description || 'Gagal mengirim pesan ke Telegram');
     }
 
-    return NextResponse.json({ success: true, message: 'Kapsul berhasil terkirim ke Telegram!' });
+    // Kembalikan credentials untuk Direct Upload media di client-side
+    return NextResponse.json({
+      success: true,
+      botToken,
+      chatId,
+    });
 
   } catch (error) {
     console.error('Telegram API Error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Gagal terhubung ke Telegram.' },
+      { success: false, error: error.message || 'Gagal memproses request.' },
       { status: 500 }
     );
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ success: true, capsules: [] });
 }
