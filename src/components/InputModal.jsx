@@ -14,18 +14,9 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
   const [media, setMedia] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [isPublic, setIsPublic] = useState(false);
-  
-  // Fitur Tambahan: Pilihan Variasi Efek Pengiriman & State Loading
-  const [animationType, setAnimationType] = useState('lampion');
   const [loading, setLoading] = useState(false);
   
   const fileInputRef = useRef(null);
-
-  const animations = [
-    { id: 'lampion', label: 'Lampion', icon: '🏮' },
-    { id: 'star', label: 'Bintang', icon: '🌠' },
-    { id: 'firefly', label: 'Kunang', icon: '✨' },
-  ];
 
   // Helper konversi Tanggal Lokal (WIB) tanpa offset UTC
   const formatLocalISO = (date) => {
@@ -72,18 +63,16 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
     if (!message) return;
 
     setLoading(true);
-
     const finalUnlockDate = unlockDate || formatLocalISO(new Date());
 
     try {
-      // 1. KIRIM DATA KE TELEGRAM BOT VIA API ENDPOINT
+      // PROSES DI BALIK LAYAR: KIRIM MEDIA/PESAN KE TELEGRAM BOT
       const formData = new FormData();
       formData.append('senderName', senderName || 'Someone');
       formData.append('message', message);
       formData.append('unlockDate', finalUnlockDate);
       formData.append('contactInfo', contactInfo || 'Tidak Ada');
-      formData.append('animationType', animationType);
-      formData.append('isPublic', isPublic ? 'true' : 'false');
+      formData.append('isPrivate', isPublic ? 'false' : 'true');
       if (media) {
         formData.append('file', media);
       }
@@ -94,17 +83,16 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
       });
 
       const result = await res.json();
-
       if (!result.success) {
-        console.warn('Telegram Notification Warning:', result.error);
+        console.warn('Telegram API Warning:', result.error);
       }
     } catch (err) {
-      console.error('Gagal mengirim ke Telegram API:', err);
+      console.error('Telegram Fetch Error:', err);
     } finally {
       setLoading(false);
     }
 
-    // 2. JALANKAN FUNGSI UTAMA WEB (STATE & ANIMASI LANSKAP)
+    // TRIGGER KAPSUL WAKTU LOKAL
     onSubmit({
       senderName: senderName || 'Someone',
       message,
@@ -112,7 +100,6 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
       contactInfo: contactInfo || null,
       media: media || null,
       isPublic,
-      animationType,
       createdAt: new Date().toISOString(),
     });
 
@@ -126,7 +113,6 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
     setMediaPreview(null);
     setShowNotificationInput(false);
     setIsPublic(false);
-    setAnimationType('lampion');
     onClose();
   };
 
@@ -168,6 +154,7 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
                   Message
                 </h2>
 
+                {/* Saklar Geser Publik / Privat */}
                 <button
                   type="button"
                   onClick={() => setIsPublic(!isPublic)}
@@ -317,30 +304,6 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
                 )}
               </AnimatePresence>
 
-              {/* Opsi 3 Efek Pengiriman (Lampion, Bintang, Kunang-kunang) */}
-              <div>
-                <span className="block text-xs text-white/40 mb-1.5 font-light">
-                  Animation Style
-                </span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {animations.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => setAnimationType(a.id)}
-                      className={`py-1.5 px-2 text-[11px] font-medium rounded-lg border transition-all flex items-center justify-center gap-1.5 ${
-                        animationType === a.id
-                          ? 'bg-amber-400/20 border-amber-400 text-amber-200 shadow-md'
-                          : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
-                      }`}
-                    >
-                      <span>{a.icon}</span>
-                      <span>{a.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Setting Durasi */}
               <div className="mt-0.5">
                 <span className="block text-xs text-white/40 mb-1.5 font-light">
@@ -395,7 +358,7 @@ export default function InputModal({ isOpen, onClose, onSubmit }) {
                 disabled={loading}
                 className="mt-2 w-full py-3 bg-white hover:bg-white/90 disabled:opacity-50 text-black font-medium text-xs sm:text-sm rounded-xl shadow-lg active:scale-[0.98] transition-all tracking-wider uppercase"
               >
-                {loading ? 'Sending Capsule...' : 'Secure This Capsule'}
+                {loading ? 'Securing Capsule...' : 'Secure This Capsule'}
               </button>
             </form>
           </motion.div>
