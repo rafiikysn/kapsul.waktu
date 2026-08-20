@@ -17,6 +17,23 @@ export default function Home() {
   const [planeTrigger, setPlaneTrigger] = useState(0);
   const [fireworksTrigger, setFireworksTrigger] = useState(0);
 
+  // Fetch data kapsul dari API (GET Polos tanpa Body)
+  useEffect(() => {
+    const fetchCapsules = async () => {
+      try {
+        const res = await fetch('/api/capsule');
+        const data = await res.json();
+        if (data.success) {
+          setCapsules(data.capsules || []);
+        }
+      } catch (err) {
+        console.log('Gagal fetch kapsul:', err);
+      }
+    };
+
+    fetchCapsules();
+  }, []);
+
   // Fetch Cuaca Real-Time Arga Makmur
   useEffect(() => {
     const fetchArgaMakmurWeather = async () => {
@@ -44,7 +61,6 @@ export default function Home() {
     return () => clearInterval(weatherInterval);
   }, []);
 
-  // Hitung Otomatis Fase Waktu Berdasarkan Jam
   const getTimePhase = (hour) => {
     if (hour >= 5 && hour < 6) return 'dawn';
     if (hour >= 6 && hour < 8) return 'sunrise';
@@ -87,19 +103,16 @@ export default function Home() {
   }, []);
 
   const handleCreateCapsule = (newCapsule) => {
-    // Tambahkan kapsul baru ke state lokal lanskap
     setCapsules((prev) => [
       ...prev,
       {
         ...newCapsule,
         id: Date.now(),
-        // Memberikan posisi acak di langit
         posX: `${Math.floor(Math.random() * 70) + 12}%`,
         posY: `${Math.floor(Math.random() * 32) + 14}%`,
       },
     ]);
 
-    // Peluncuran mercon otomatis
     setFireworksTrigger((prev) => prev + 1);
   };
 
@@ -119,7 +132,7 @@ export default function Home() {
         .lock-icon-twinkle { animation: lockIconTwinkle 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
       `}</style>
 
-      {/* Background Lanskap */}
+      {/* Background Lanskap Real-Time */}
       <Landscape 
         timeOfDay={selectedTime} 
         weather={selectedWeather}
@@ -127,7 +140,7 @@ export default function Home() {
         triggerFireworks={fireworksTrigger}
       />
 
-      {/* LAPISAN KAPSUL MELAYANG DI LANGIT */}
+      {/* Lapisan Kapsul Melayang di Langit */}
       <FloatingCapsules capsules={capsules} />
 
       {/* Header Jam & Tanggal */}
