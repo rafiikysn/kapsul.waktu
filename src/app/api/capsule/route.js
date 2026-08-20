@@ -30,7 +30,6 @@ export async function POST(request) {
       `━━━━━━━━━━━━━━━━━━━\n\n` +
       `📝 *Pesan:*\n"${message}"`;
 
-    // Kirim pesan teks ke Telegram
     const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -46,7 +45,6 @@ export async function POST(request) {
       throw new Error(tgData.description || 'Gagal mengirim pesan ke Telegram');
     }
 
-    // Kembalikan credentials untuk Direct Upload media di client-side
     return NextResponse.json({
       success: true,
       botToken,
@@ -62,6 +60,7 @@ export async function POST(request) {
   }
 }
 
+// HANDLER GET BERSIH TANPA REQUEST BODY
 export async function GET() {
   return NextResponse.json({ success: true, capsules: [] });
 }
